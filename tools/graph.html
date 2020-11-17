@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Zoom visualizer</title>
+	<meta charset="utf-8">
+	<meta name='viewport' content='width=device-width'>
+	<style type="text/css">
+		#graph {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			z-index: 1;
+		}
+
+		#overlay {
+			padding: 0.5em;
+			position: absolute;
+			z-index: 10;
+			top: 0;
+			left: 0;
+			font-family: monospace;
+		}
+
+		#overlay ul {			
+			list-style: none;
+			margin: 0;
+			padding: 0;
+			display: flex;
+			flex-wrap: wrap;
+			font-size: 1.25em;
+		}
+
+		#overlay ul > * {
+			margin-right: 1em;
+		}
+	</style>
+</head>
+<body>
+	<div id='overlay'>
+		<ul id='stats'>Welcome! Start scrolling around to see some numbers.</ul>
+	</div>
+	<svg id='graph'>
+		<rect fill='none' stroke='red' stroke-width='2' x='0' y='0' width='100%' height='100%'/>
+	</svg>
+	<script type="text/javascript">
+		(() => {
+			let graph = document.getElementById('graph');
+			let stats = document.getElementById('stats');
+
+			let logEvent = e => {
+				let type = e.type;
+				let html = `
+					<li><strong>type</strong> ${type}</li>
+				`;
+
+				if (type === 'wheel') {
+					html += `
+					<li><strong>Δx</strong> ${e.deltaX}</li>
+					<li><strong>Δy</strong> ${e.deltaY}</li>
+					<li><strong>mode</strong> ${ e.deltaMode === 0 ? 'pixels' :  e.deltaMode === 1 ? 'lines' : 'pages' }</li>`;
+				} else {
+					html += `
+						<li><strong>scale</strong> ${e.scale}</li>
+						<li><strong>rotation</strong> ${e.rotation}</li>
+					`;
+				}
+
+				html += `<li><strong>keys</strong> 
+					${e.shiftKey ? 'shift' : ''}
+					${e.altKey ? 'alt' : ''}
+					${e.ctrlKey ? 'ctrl' : ''}
+					${e.metaKey ? 'meta' : ''}
+				</li>`;
+
+				stats.innerHTML = html;
+
+				e.preventDefault();
+			};
+
+			['wheel',
+			'gesturestart',
+			'gesturechange',
+			'gestureend'].forEach(evt => graph.addEventListener(evt, logEvent));
+
+		})();
+	</script>
+</body>
+</html>
