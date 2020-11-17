@@ -35,19 +35,62 @@
 		#overlay ul > * {
 			margin-right: 1em;
 		}
+
+		#overlay ul:not(:first-of-type) {
+			color: #999;
+		}
+
+		#target {
+			transform-origin: 50% 50%;
+		}
 	</style>
 </head>
 <body>
 	<div id='overlay'>
-		<ul id='stats'>Welcome! Start scrolling around to see some numbers.</ul>
+		<div id='stats'>Welcome! Start scrolling around to see some numbers.</div>
 	</div>
 	<svg id='graph'>
 		<rect fill='none' stroke='red' stroke-width='2' x='0' y='0' width='100%' height='100%'/>
+		<rect id='target' fill='red' stroke='black' width='200' height='100' x='50%' y='50%'/>
 	</svg>
 	<script type="text/javascript">
 		(() => {
 			let graph = document.getElementById('graph');
 			let stats = document.getElementById('stats');
+			let target = document.getElementById('target');
+
+			let queue = [];
+
+			let scale = 1, rotation = 0;
+
+			let logWheel = e => {
+				return `
+					<li><strong>Δx</strong> ${e.deltaX}</li>
+					<li><strong>Δy</strong> ${e.deltaY}</li>
+					<li><strong>mode</strong> ${ e.deltaMode === 0 ? 'pixels' :  e.deltaMode === 1 ? 'lines' : 'pages' }</li>`;
+			};
+
+			let logGesture = e => {
+				return `
+						<li><strong>scale</strong> ${e.scale}</li>
+						<li><strong>rotation</strong> ${e.rotation}</li>
+					`;
+			};
+
+			let logTouch = e => {
+				return `
+					<li><strong>x</strong> ${e.clientX}</li>
+					<li><strong>y</strong> ${e.clientY}</li>
+				`;
+			};
+
+			let logPointer = e => {
+				return `
+					<li><strong>id</strong> ${e.pointerId}</li>
+					<li><strong>x</strong> ${e.clientX}</li>
+					<li><strong>y</strong> ${e.clientY}</li>
+				`;
+			};
 
 			let logEvent = e => {
 				let type = e.type;
@@ -56,15 +99,18 @@
 				`;
 
 				if (type === 'wheel') {
-					html += `
-					<li><strong>Δx</strong> ${e.deltaX}</li>
-					<li><strong>Δy</strong> ${e.deltaY}</li>
-					<li><strong>mode</strong> ${ e.deltaMode === 0 ? 'pixels' :  e.deltaMode === 1 ? 'lines' : 'pages' }</li>`;
+					html += logWheel(e);
+				} else if (type.match(/^touch/)) {
+					html += logTouch(e);
+				} else if (type.match(/^pointer/)) {
+					html += logPointer(e);
+				} else if (type.match(/^gesture/)) {
+					html += logGesture(e);
+					scale = e.scale;
+					rotation += e.rotation;
+					target.setAttribute('transform',`scale(${scale}) rotate(${rotation})`)
 				} else {
-					html += `
-						<li><strong>scale</strong> ${e.scale}</li>
-						<li><strong>rotation</strong> ${e.rotation}</li>
-					`;
+					html += 'N/A';
 				}
 
 				html += `<li><strong>keys</strong> 
@@ -74,15 +120,27 @@
 					${e.metaKey ? 'meta' : ''}
 				</li>`;
 
-				stats.innerHTML = html;
+				queue.unshift(`<ul>${html}</ul>`);
+				queue.length = 10;
+
+				stats.innerHTML = queue.join('\n');
 
 				e.preventDefault();
 			};
 
-			['wheel',
-			'gesturestart',
-			'gesturechange',
-			'gestureend'].forEach(evt => graph.addEventListener(evt, logEvent));
+			[
+				'wheel',
+				'pointerdown',
+				'pointermove',
+				'pointerup',
+				'pointercancel',
+				'touchstart',
+				'touchmove',
+				'touchend',
+				'gesturestart',
+				'gesturechange',
+				'gestureend'
+			].forEach(evt => graph.addEventListener(evt, logEvent));
 
 		})();
 	</script>
