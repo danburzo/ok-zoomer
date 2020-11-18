@@ -9,6 +9,7 @@ const init = () => {
 	window.addEventListener('keydown', e => e.key === 'Control' && (is_ctrl = true), { capture: true });
 	window.addEventListener('keyup', e => e.key === 'Control' && (is_ctrl = false), { capture: true });
 	window.addEventListener('pagehide', () => is_ctrl = false);
+	window.addEventListener('blur', () => is_ctrl = false);
 	document.addEventListener('visibilitychange', () => document.visibilityState !== 'visible' && (is_ctrl = false));
 	has_been_init = true;
 };
