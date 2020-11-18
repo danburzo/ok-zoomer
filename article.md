@@ -30,7 +30,10 @@ Are web apps as lucky? In this article, we explore the parts of the Web APIs we 
 
 The `WheelEvent` (`wheel`) is triggered when the user intends to scroll an element. This was originally done with the mouse's wheel (hence the name), but then applied to other pointing devices — the trackpad might have had a separate "scroll area", and later became sophisticated enough to accept multi-finger gestures.
 
-The `WheelEvent` has specific properties, `deltaX`, `deltaY`, and `deltaZ` to encode the (potentially 3D) movement dictated by the input device, and `deltaMode` to establish the unit of measurement (pixels, lines, or pages).
+The `WheelEvent` has specific properties, `deltaX`, `deltaY`, and `deltaZ` to encode the (potentially 3D) movement dictated by the input device, and `deltaMode` to establish the unit of measurement:
+* `DOM_DELTA_PIXEL: 0` for pixels,
+* `DOM_DELTA_LINE: 1` for lines, or
+* `DOM_DELTA_PAGE: 2` for pages.
 
 As pinch gestures on trackpads became more commonplace, browser implementers started thinking of ways to support them in desktop browsers. Chrome settled on [an approach](https://bugs.chromium.org/p/chromium/issues/detail?id=289887) inspired by Internet Explorer: encode pinch gestures as `wheel` events with `event.ctrlKey` set to `true`, and `deltaY` encoding the scale. Firefox eventually [followed suit](https://bugzilla.mozilla.org/show_bug.cgi?id=1052253), and with Microsoft Edge recently switching to Chromium, we end up with a de-facto standard. 
 
@@ -44,17 +47,18 @@ On touchscreen-powered devices, we have more flexibility. While only mobile Safa
 
 Equipped with the theoretical knowledge, let's see how things actually pan out on a variety of devices. Scrambling for hardware, I produced:
 
-* an Apple MacBook Pro with an external Magic Trackpad, running macOS Big Sur;
-* a Microsoft Surface Laptop with a touchscreen, built-in Precision Trackpad and external mouse, running Windows 10;
-* an Asus notebook with a (non-precision) trackpad and external mouse, again running Windows 10;
+* an Apple MacBook Pro running macOS Big Sur;
+* a Microsoft Surface Laptop with a touchscreen and built-in Precision Trackpad, running Windows 10;
+* an Asus notebook with a non-precision trackpad, also running Windows 10;
 * an iPhone running iOS 14; and,
-* an iPad with a Folio keyboard, running iPadOS 14.
+* an iPad with a Folio keyboard, running iPadOS 14;
+* an external mouse to test with macOS and Windows.
 
-On these devices, I've installed recent versions of Mozilla Firefox, Google Chrome, Apple Safari, and Microsoft Edge (Chromium-based).
+On these devices I've installed recent versions of Mozilla Firefox, Google Chrome, Apple Safari, and Microsoft Edge (Chromium-based).
 
 I've created [a test page](https://danburzo.github.io/ok-zoomer/tools/graph) that displays relevant properties of all wheel, gesture, pointer and touch events captured. Let's see at some of the results.
 
-### macOS results
+### Results on a macOS trackpad
 
 As advertised, Firefox and Chrome generally produce a `wheel` event with a `deltaY` and `ctrlKey: true`. They also produce this result when you scroll normally while holding the <kbd>Ctrl</kbd> key pressed, a combo especially familiar to Windows users of various native visual tools for zooming in and out.
 
@@ -71,7 +75,7 @@ window.addEventListener('keyup', e => e.key === 'Control' && (is_ctrl = false), 
 window.addEventListener('pagehide', () => is_ctrl = false);
 window.addEventListener('blur', () => is_ctrl = false);
 document.addEventListener('visibilitychange', () => document.visibilityState !== 'visible' && (is_ctrl = false));
-	
+  
 ```
 
 A couple of notes on the code:
@@ -105,11 +109,51 @@ Some default browser behaviors to deflect with `event.preventDefault()` on the r
 * `Cmd + wheel` in Firefox zooms in and out of the page, similarly to `Cmd +` and `Cmd -`;
 * Pinching inwards in Safari will minimize the browser tab and show a tab overview screen.
 
-### Windows results
+### Results with an external mouse on macOS
 
-Firefox, Chrome and Edge work like their macOS counterparts on Windows devices equipped with a Precision Trackpad.
+External third-party mice are treated differently than a trackpad. Instead of smooth pixel increments, the mouse's wheel jumps whole _lines_ at a time. (The _Scrolling speed_ setting in _System Preferences > Mouse_ controls how many.)
 
-It's older trackpads and external mice that add some accidental complexity to the mix. 
+Firefox shows a small `deltaY` and `deltaMode: DOM_DELTA_LINE`. Chrome and Safari instead produce a much larger `deltaY` and the unit is, like with the trackpad, pixels (`deltaMode: DOM_DELTA_PIXEL`). Firefox seems to [base the line-scrolling mode](https://stackoverflow.com/questions/20110224/what-is-the-height-of-a-line-in-a-wheel-event-deltamode-dom-delta-line) on the initial font size, so a good-enough approximation is `delta_in_pixels = 16 * delta_in_lines`.
+
+In all three browsers, `deltaX` is normally zero. Holding down the <kbd>Shift</kbd> key reverses the scroll axis, and makes `deltaY` zero instead.
+
+### Results on Windows 10
+
+A Precision Trackpad works on Windows similarly to Magic Trackpad on macOS. Firefox, Chrome, and Edge all produce results compatible to what we've seen previously, which is encouraging! But alas, it's the older trackpads and external mice that add some accidental complexity to the mix.
+
+On Windows, the wheel on external mice has two scroll modes: `L` _lines_ at a time (with a configurable `N`), or a whole _page_ at a time.
+
+A comprehensive test will require us to test in all three browsers all combinations of:
+* scrolling mode: `N = 3` lines, `N = 5` lines, and a whole page at a time;
+* device: external mouse, trackpad;
+* gesture (where applicable): vertical scroll, horizontal scroll, pinch gesture;
+* modifier keys: `Ctrl`, `Shift`, etc.
+
+There are too many combos to document without getting bogged down into minutiae. Instead, I'm going to focus on a few surprising results:
+
+
+
+* Firefox will produce either `deltaY: ±L, deltaMode: DOM_DELTA_LINE` or `deltaY: ±1, deltaMode: DOM_DELTA_PAGE`, depending on the mouse configuration. This is similar to what we're seeing on macOS.
+* When using line-scrolling, Chrome generates `deltaMode: DOM_DELTA_PIXEL` (pixels), with a `deltaY: ±N * L`, where N is a multiplier that varies by machine: I've seen `33px` on the Asus laptop and `50px` on the Microsoft Surface. (To do: figure out what the rationale for that is.) When switching to page-scrolling, Chrome generates `deltaY: ±1, deltaMode: DOM_DELTA_PAGE`.
+* Edge is slightly weirder than Chrome. On line-scrolling, it produces a `deltaY: ±100`, regardless of the value of `L`. When using page-scrolling, the behavior matches Chrome's. 
+
+None of the three browsers support holding down the <kbd>Shift</kbd> to reverse the scroll axis on an external mouse.
+
+What about the built-in, non-precision trackpad? This is where things get weirder.
+
+First, some terms: by the primary scroll axis we mean the vertical axis, and by the secondary axis the horizontal one. 
+
+The effect of scrolling on the primary axis will mostly be equivalent to a mouse wheel's. The behavior of the secondary axis will not necessarily match it. 
+
+* In Firefox, in line-scrolling mode, scrolls on both axes produce `deltaMode: DOM_DELTA_LINE` with `deltaX` and `deltaY`, respectively, a fraction of a line. A pinch gesture produces a constant `deltaY: ±L, deltaMode: DOM_DELTA_LINE` (lines). In page-scrolling mode, scrolls on the primary axis produce `deltaMode: DOM_DELTA_PAGE`, while on the secondary axis, it remains in `deltaMode: DOM_DELTA_LINE`. The pinch gesture produces `deltaY: ±1, deltaMode: DOM_DELTA_PAGE, ctrlKey: true`.
+* In Chrome, the trackpad behaves similarly to the external mouse: we get `deltaY: ±N * L, deltaMode: DOM_DELTA_PIXEL` for line-scrolling and `deltaY: ±1, deltaMode: DOM_DELTA_PAGE` for page-scrolling. When scrolling on the secondary axis, `deltaX` is left unexpectedly unpopulated; instead, we get `deltaY: N * L, shiftKey: true`. 
+* In Edge: for line-scrolling we get the hardcoded `deltaY: 100, deltaMode: DOM_DELTA_PIXEL` for pinching (and a fraction of that when scrolling), while for page-scrolling mode we get a hardcoded `deltaY: ±1, deltaMode: DOM_DELTA_PAGE` for pitching and a fraction of that when scrolling the main primary axis. When scrolling on the secondary axis, we get `deltaMode: DOM_DELTA_PIXEL`.
+
+## Turning a `WheelEvent` into an equivalent `GestureEvent`
+
+With browser data from Windows and macOS on a variety of devices, we're ready to start to think of ways to interpret wheel events as gestures.
+
+## `TouchEvent`
 
 ## The math bits
 ```
