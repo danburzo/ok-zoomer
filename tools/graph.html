@@ -21,6 +21,7 @@
 			top: 0;
 			left: 0;
 			font-family: monospace;
+			pointer-events: none;
 		}
 
 		#overlay ul {			
@@ -52,12 +53,19 @@
 	<svg id='graph'>
 		<rect fill='none' stroke='red' stroke-width='2' x='0' y='0' width='100%' height='100%'/>
 		<rect id='target' fill='red' stroke='black' width='200' height='100' x='50%' y='50%'/>
+		<path id='path' stroke='red' fill='none'/>
+		<circle id='ptr' fill='blue' r='3'/>
 	</svg>
 	<script type="text/javascript">
 		(() => {
+
+			let path = [[ 300, 300 ]];
+
 			let graph = document.getElementById('graph');
 			let stats = document.getElementById('stats');
 			let target = document.getElementById('target');
+			let path_el = document.getElementById('path');
+			let ptr_el = document.getElementById('ptr');
 
 			let queue = [];
 
@@ -72,6 +80,8 @@
 
 			let logGesture = e => {
 				return `
+						<li><strong>x</strong> ${e.clientX}</li>
+						<li><strong>y</strong> ${e.clientY}</li>
 						<li><strong>scale</strong> ${e.scale}</li>
 						<li><strong>rotation</strong> ${e.rotation}</li>
 					`;
@@ -92,14 +102,25 @@
 				`;
 			};
 
+			let drawGraph = e => {
+				path_el.setAttribute('d', `M ` + path.map(it => `${it[0]} ${it[1]}`).join(' L '));
+				let last = path[path.length - 1];
+				ptr_el.setAttribute('cx', last[0]);
+				ptr_el.setAttribute('cy', last[1]);
+			};
+
 			let logEvent = e => {
 				let type = e.type;
+
 				let html = `
 					<li><strong>type</strong> ${type}</li>
 				`;
 
 				if (type === 'wheel') {
 					html += logWheel(e);
+					let last = path[path.length - 1];
+					path.push([last[0] + e.deltaX, last[1] + e.deltaY]);
+					drawGraph();
 				} else if (type.match(/^touch/)) {
 					html += logTouch(e);
 				} else if (type.match(/^pointer/)) {
@@ -107,7 +128,7 @@
 				} else if (type.match(/^gesture/)) {
 					html += logGesture(e);
 					scale = e.scale;
-					rotation += e.rotation;
+					rotation = e.rotation;
 					target.setAttribute('transform',`scale(${scale}) rotate(${rotation})`)
 				} else {
 					html += 'N/A';
@@ -125,6 +146,7 @@
 
 				stats.innerHTML = queue.join('\n');
 
+				console.log(e);
 				e.preventDefault();
 			};
 
