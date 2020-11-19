@@ -1,29 +1,50 @@
 let has_been_init = false;
 let is_safari, is_ios;
-let is_ctrl = null;
+let monitor;
 
 const init = () => {
 	if (has_been_init) return;
 	is_safari = typeof GestureEvent !== 'undefined';
 	is_ios = is_safari && typeof TouchEvent !== 'undefined';
-	window.addEventListener('keydown', e => e.key === 'Control' && (is_ctrl = true), { capture: true });
-	window.addEventListener('keyup', e => e.key === 'Control' && (is_ctrl = false), { capture: true });
-	window.addEventListener('pagehide', () => is_ctrl = false);
-	window.addEventListener('blur', () => is_ctrl = false);
-	document.addEventListener('visibilitychange', () => document.visibilityState !== 'visible' && (is_ctrl = false));
+	monitor = keyMonitor(['Control']);
 	has_been_init = true;
 };
 
-const PIXEL_MODE = 0, LINE_MODE = 1, PAGE_MODE = 2;
+const keyMonitor = keys => {
+	let watchlist = new Set(keys);
+	let active = new Set();
+	window.addEventListener('keydown', e => watchlist.has(e.key) && active.add(e.key), { capture: true });
+	window.addEventListener('keyup', e =>  watchlist.has(e.key) && active.remove(e.key), { capture: true });
+	window.addEventListener('pagehide', () => active.clear());
+	window.addEventListener('blur', () => active.clear());
+	document.addEventListener('visibilitychange', () => document.visibilityState !== 'visible' && (active.clear()));
+	return active;
+};
+
+const normalizeWheel = (e, is_physical_ctrl_key) => {
+
+	let dx = e.deltaX;
+	let dy = e.deltaY;
+
+	if (e.shiftKey && dx === 0) {
+		let tmp = dx;
+		dx = dy;
+		dy = tmp;
+	}
+
+	if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+		dx *= 8;
+		dy *= 8;
+	} else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+		dx *= 16;
+		dy *= 16;
+	}
+
+	return [dx, dy];
+};
 
 const okzoomer = (el, opts = {}) => {
 	let options = {
-		/*
-			The scaling factor for transforming 
-			the `lines` deltaMode to the `pixels` deltaMode.
-			The default is based on the Firefox about:config values.
-		 */
-		lineMultiplier: 100
 		...opts
 	};
 	init();
@@ -44,15 +65,8 @@ const okzoomer = (el, opts = {}) => {
 	}
 	el.addEventListener('wheel', e => {
 		let handled = false;
-
-		let dx = e.deltaX;
-		let dy = e.deltaY;
-
-		if (e.deltaMode === LINE_MODE) {
-			dx *= options.lineMultiplier;
-			dy *= options.lineMultiplier;
-		} 
-
+		let is_ctrl = monitor.has('Control');
+		let [dx, dy] = normalizeWheel(e, is_ctrl);
 		if (e.ctrlKey && !is_ctrl) {
 			// Pinch gesture
 			console.log('pinch');
@@ -66,7 +80,7 @@ const okzoomer = (el, opts = {}) => {
 
 		// Prevent history navigation behavior in Firefox
 		// on Alt + Wheel shortcut.
-		if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+		if (!handled && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
 			handled = true;
 		}
 		if (handled) {
@@ -75,4 +89,4 @@ const okzoomer = (el, opts = {}) => {
 	});
 };
 
-export default okzoomer;
+export { okzoomer, normalizeWheel, keyMonitor };

@@ -75,7 +75,10 @@
 				return `
 					<li><strong>Δx</strong> ${e.deltaX}</li>
 					<li><strong>Δy</strong> ${e.deltaY}</li>
-					<li><strong>mode</strong> ${ e.deltaMode === 0 ? 'pixels' :  e.deltaMode === 1 ? 'lines' : 'pages' }</li>`;
+					<li><strong>mode</strong> ${ e.deltaMode === 0 ? 'pixels' :  e.deltaMode === 1 ? 'lines' : 'pages' }</li>
+					<li><strong>x</strong> ${e.clientX}</li>
+					<li><strong>y</strong> ${e.clientY}</li>
+				`;
 			};
 
 			let logGesture = e => {

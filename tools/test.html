@@ -2,12 +2,49 @@
 <html>
 <head>
 	<title>OK Zoomer Test</title>
+	<style type="text/css">
+		#target {
+			background:red; 
+			width: 400px; 
+			height: 200px;
+			position: absolute;
+			top: calc(50% - 100px);
+			left: calc(50% - 200px);
+
+		}
+	</style>
 </head>
 <body>
-	<div style='background:red; width:200px; height: 100px'>Gesture target</div>
+	<div id='target' data-scale='1' data-rotation='0'>Gesture target</div>
 	<script type="module">
-		import okz from '../src/index.js';
-		okz(document.querySelector('div'));
+		import { okzoomer, normalizeWheel, keyMonitor } from '../src/index.js';
+		let el = document.querySelector('#target');
+		let monitor = keyMonitor(['Control']);
+
+		const clamp = v => Math.max(0.04, Math.min(32, v));
+
+		document.addEventListener('wheel', e => {
+			let [dx, dy] = normalizeWheel(e, monitor.has('Control'));
+			let MULTIPLIER = 3; // so that wheel events match gestures from safari
+			// TODO add log scale
+			let scale = clamp(parseFloat(target.dataset.scale) - Math.max(-15, Math.min(dy, 15)) / 100 * MULTIPLIER);
+			target.dataset.scale = scale;
+			target.style.transform = `scale(${scale})`;
+			e.preventDefault();
+		}, { passive: false });
+
+		
+		let initial_scale;
+		document.addEventListener('gesturestart', e => {
+			initial_scale = target.dataset.scale;
+			e.preventDefault();
+		});
+		document.addEventListener('gesturechange', e => {
+			let scale = clamp(e.scale * initial_scale);
+			target.dataset.scale = scale;
+			target.style.transform = `scale(${scale})`;
+			e.preventDefault();
+		});
 	</script>
 </body>
 </html>
