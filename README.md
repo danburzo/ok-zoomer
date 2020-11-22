@@ -1,6 +1,8 @@
 # ok-zoomer
 
-An okay way to pinch-zoom an element.
+Okay ways to pinch-zoom on the web.
 
-* [Test page](https://danburzo.github.io/ok-zoomer/tools/graph)
-* [Write-up (WIP)](./article.md)
+You'll find here:
+
+* a [JavaScript implementation](./src/index.js);
+* an [event debug page](https://danburzo.github.io/ok-zoomer/tools/debug).
