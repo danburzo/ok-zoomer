@@ -23,28 +23,30 @@
 
 		const clamp = v => Math.max(0.04, Math.min(32, v));
 
-		document.addEventListener('wheel', e => {
-			let [dx, dy] = normalizeWheel(e, monitor.has('Control'));
-			let MULTIPLIER = 3; // so that wheel events match gestures from safari
-			// TODO add log scale
-			let scale = clamp(parseFloat(target.dataset.scale) - Math.max(-15, Math.min(dy, 15)) / 100 * MULTIPLIER);
-			target.dataset.scale = scale;
-			target.style.transform = `scale(${scale})`;
-			e.preventDefault();
-		}, { passive: false });
+		okzoomer(el);
+
+		// document.addEventListener('wheel', e => {
+		// 	let [dx, dy] = normalizeWheel(e, monitor.has('Control'));
+		// 	let MULTIPLIER = 3; // so that wheel events match gestures from safari
+		// 	// TODO add log scale
+		// 	let scale = clamp(parseFloat(target.dataset.scale) - Math.max(-15, Math.min(dy, 15)) / 100 * MULTIPLIER);
+		// 	target.dataset.scale = scale;
+		// 	target.style.transform = `scale(${scale})`;
+		// 	e.preventDefault();
+		// }, { passive: false });
 
 		
-		let initial_scale;
-		document.addEventListener('gesturestart', e => {
-			initial_scale = target.dataset.scale;
-			e.preventDefault();
-		});
-		document.addEventListener('gesturechange', e => {
-			let scale = clamp(e.scale * initial_scale);
-			target.dataset.scale = scale;
-			target.style.transform = `scale(${scale})`;
-			e.preventDefault();
-		});
+		// let initial_scale;
+		// document.addEventListener('gesturestart', e => {
+		// 	initial_scale = target.dataset.scale;
+		// 	e.preventDefault();
+		// });
+		// document.addEventListener('gesturechange', e => {
+		// 	let scale = clamp(e.scale * initial_scale);
+		// 	target.dataset.scale = scale;
+		// 	target.style.transform = `scale(${scale})`;
+		// 	e.preventDefault();
+		// });
 	</script>
 </body>
 </html>
