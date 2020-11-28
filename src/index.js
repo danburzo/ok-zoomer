@@ -1,203 +1,180 @@
-let has_been_init = false;
-let is_ios;
-let monitor;
-
-function initialize() {
-	if (has_been_init) return;
-	is_ios = typeof GestureEvent !== 'undefined' && typeof TouchEvent !== 'undefined';
-	monitor = keyMonitor('Control');
-	has_been_init = true;
-};
-
-/*
-	Monitor (mostly accurately) the pressed state 
-	of a key or array of keys on the keyboard.
- */
-function keyMonitor(keys) {
-	// We assume no keys are pressed at initialization-time
-	let activeKeys = new Set();
-	if (keys) {
-		// Accept either a string or an array
-		let watchedKeys = new Set(Array.isArray(keys) ? keys : [keys]);
-		window.addEventListener('keydown', e => watchedKeys.has(e.key) && activeKeys.add(e.key), { capture: true });
-		window.addEventListener('keyup', e =>  watchedKeys.has(e.key) && activeKeys.remove(e.key), { capture: true });
-		window.addEventListener('pagehide', () => activeKeys.clear());
-		window.addEventListener('blur', () => activeKeys.clear());
-		document.addEventListener('visibilitychange', () => document.visibilityState !== 'visible' && activeKeys.clear());
-	}
-	return activeKeys;
-};
+const WHEEL_SPEEDUP = 2;
+const DELTA_LINE_MULTIPLIER = 8;
+const DELTA_PAGE_MULTIPLIER = 24;
+const MAX_WHEEL_DELTA = 24;
 
 function normalizeWheel(e) {
-
 	let dx = e.deltaX;
 	let dy = e.deltaY;
-
 	if (e.shiftKey && dx === 0) {
 		let tmp = dx;
 		dx = dy;
 		dy = tmp;
 	}
-
 	if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
-		dx *= 8;
-		dy *= 8;
+		dx *= DELTA_LINE_MULTIPLIER;
+		dy *= DELTA_LINE_MULTIPLIER;
 	} else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
-		dx *= 24;
-		dy *= 24;
+		dx *= DELTA_PAGE_MULTIPLIER;
+		dy *= DELTA_PAGE_MULTIPLIER;
+	}
+	return [limit(dx, MAX_WHEEL_DELTA), limit(dy, MAX_WHEEL_DELTA)];
+}
+
+function limit(delta, max_delta) {
+	return Math.sign(delta) * Math.min(max_delta, Math.abs(delta));
+}
+
+function midpoint(touches) {
+	let [t1, t2] = touches;
+	return [(t1.clientX + t2.clientX) / 2, (t1.clientY + t2.clientY) / 2];
+}
+
+function distance(touches) {
+	let [t1, t2] = touches;
+	let dx = t2.clientX - t1.clientX;
+	let dy = t2.clientY - t2.clientY;
+	return Math.sqrt(dx * dx + dy * dy);
+}
+
+function angle(touches) {
+	let [t1, t2] = touches;
+	let dx = t2.clientX - t1.clientX;
+	let dy = t2.clientY - t2.clientY;
+	return (180 / Math.PI) * Math.atan2(dy, dx);
+}
+
+function clientToHTMLElementCoords(element, coords) {
+	let rect = element.getBoundingClientRect();
+	return {
+		x: coords[0] - rect.x,
+		y: coords[1] - rect.y
+	};
+}
+
+function clientToSVGElementCoords(element, coords) {
+	let screen_to_el = element.getScreenCTM().inverse();
+	let point = element.ownerSVGElement.createSVGPoint();
+	point.x = coords[0];
+	point.y = coords[1];
+	return point.matrixTransform(screen_to_el);
+}
+
+export default function okzoomer(element, opts) {
+	function noop() {
+		/* do nothing */
 	}
 
-	return [dx, dy];
-};
+	let options = opts || {};
 
-function okzoomer(el) {
-	initialize();
+	let startGesture = options.startGesture || noop;
+	let doGesture = options.doGesture || noop;
+	let endGesture = options.endGesture || noop;
 
+	// TODO: we shouldn't be reusing gesture
+	let gesture = false;
+	let timer;
 
-	if (typeof TouchEvent !== 'undefined') {
+	let origin;
+	if (element instanceof HTMLElement) {
+		origin = clientToHTMLElementCoords;
+	} else if (element instanceof SVGElement) {
+		origin = clientToSVGElementCoords;
+	} else {
+		throw new Error('unsupported element type, expecting HTML or SVG');
+	}
 
-		let has_gesture = false;
-		let initial_touches;
-
-		function touchstart(e) {
-			el.addEventListener('touchmove', touchmove);
-			el.addEventListener('touchend', touchend);
-			// Touch starts with two fingers directly
-			if (e.targetTouches.length === 2) {
-				touchmove(e);
-			}
-		};
-
-		function gestureCenter(touches) {
-			return {
-				clientX: (touches[0].clientX + touches[1].clientX)/2, 
-				clientY: (touches[0].clientY + touches[1].clientY)/2
+	document.addEventListener('wheel', function wheelListener(e) {
+		e.preventDefault();
+		let [, dy] = normalizeWheel(e);
+		if (!gesture) {
+			gesture = {
+				scale: 1,
+				origin: origin(element, [e.clientX, e.clientY])
 			};
-		}
-
-		function distance(touches) {
-			return Math.sqrt(
-				Math.pow(touches[0].clientX - touches[1].clientX, 2) + Math.pow(touches[0].clientY - touches[1].clientY, 2)
-			);
-		}
-
-		function angle(touches) {
-			return 180 / Math.PI * Math.atan2(touches[1].clientY - touches[0].clientY, touches[1].clientX - touches[0].clientX);
-		}
-
-		function translation(new_touches, initial_touches) {
-			let new_c = gestureCenter(new_touches);
-			let initial_c = gestureCenter(initial_touches);
-			return {
-				x: new_c.clientX - initial_c.clientX,
-				y: new_c.clientYT - initial_c.clientY
+			startGesture(gesture);
+		} else {
+			gesture = {
+				scale: gesture.scale * (1 - (WHEEL_SPEEDUP * dy) / 100),
+				origin: origin(element, [e.clientX, e.clientY])
 			};
+			doGesture(gesture);
 		}
-
-		function rotation(new_touches, initial_touches) {
-			return angle(new_touches) - angle(initial_touches);	
+		if (timer) {
+			window.clearTimeout(timer);
 		}
-
-		function scale(new_touches, initial_touches) {
-			return distance(new_touches) / distance(initial_touches);
-		}
-		
-		function touchmove(e) {
-			if (e.targetTouches.length === 2) {
-				if (!has_gesture) {
-					initial_touches = [
-						{ clientX: e.targetTouches[0].clientX, clientY: e.targetTouches[0].clientY },
-						{ clientX: e.targetTouches[1].clientX, clientY: e.targetTouches[1].clientY }	
-					];
-					el.dispatchEvent(
-						new CustomEvent('gesturestart', {
-							detail: {
-								...gestureCenter(initial_touches),
-								scale: 1,
-								rotation: 0,
-								translation: 0
-							}
-						})
-					);
-					has_gesture = true;
-				} else {
-					el.dispatchEvent(
-						new CustomEvent('gesturechange', {
-							detail: {
-								...gestureCenter(e.targetTouches),
-								scale: scale(e.targetTouches, initial_touches),
-								rotation: rotation(e.targetTouches, initial_touches),
-								translation: translation(e.targetTouches, initial_touches)
-							}
-						})
-					);
-				}
-				e.preventDefault();
-			} else if (has_gesture) {
-				el.dispatchEvent(
-					new CustomEvent('gestureend', {
-						// Should we send details here?
-						detail: null
-					})
-				);
-				has_gesture = false;
-				e.preventDefault();
+		timer = window.setTimeout(() => {
+			if (gesture) {
+				endGesture(gesture);
+				gesture = null;
 			}
-		};
+		}, 200);
+	});
 
-		function touchend(e) {
-			el.removeEventListener('touchmove', touchmove);
-			el.removeEventListener('touchend', touchend);
+	let initial_touches;
+	function touchMove(e) {
+		if (e.touches.length === 2) {
+			let mp_init = midpoint(initial_touches);
+			let mp_curr = midpoint(e.touches);
+			gesture = {
+				scale: distance(e.touches) / distance(initial_touches),
+				rotation: angle(e.touches) - angle(initial_touches),
+				translation: [mp_curr.x - mp_init.x, mp_curr.y - mp_init.y],
+				origin: origin(element, mp_init)
+			};
+			doGesture(gesture);
 			e.preventDefault();
-		};
-
-		el.addEventListener('touchstart', touchstart);
+		}
 	}
 
-	/*
-		Safari
-	 */
-	if (typeof TouchEvent !== 'undefined' || typeof GestureEvent !== 'undefined') {
-		el.addEventListener('gesturestart', e => {
-			// Prevent pinch-out-of-page gesture
-			console.log(e);
+	element.addEventListener('touchstart', function watchTouches(e) {
+		if (e.touches.length === 2) {
+			gesture = {
+				scale: 1,
+				rotation: 0,
+				translation: [0, 0],
+				origin: origin(element, midpoint(initial_touches))
+			};
 			e.preventDefault();
-		});
-		
-		el.addEventListener('gesturechange', e => {
-			// Prevent pinch-out-of-page gesture
-			console.log(e);
-			e.preventDefault();
-		});
-
-		el.addEventListener('gestureend', e => {
-			console.log(e);
-		});
-	}
-	el.addEventListener('wheel', e => {
-		let handled = false;
-		let is_ctrl = monitor.has('Control');
-		let [dx, dy] = normalizeWheel(e, is_ctrl);
-		if (e.ctrlKey && !is_ctrl) {
-			// Pinch gesture
-			console.log('pinch');
-			handled = true;
-		}
-		if (!handled && ((e.ctrlKey && is_ctrl) || e.metaKey)) {
-			// Ctrl + Wheel
-			console.log('ctrl + wheel, ctrl + pinch');
-			handled = true;
-		}
-
-		// Prevent history navigation behavior in Firefox
-		// on Alt + Wheel shortcut.
-		if (!handled && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-			handled = true;
-		}
-		if (handled) {
-			e.preventDefault();
+			startGesture(gesture);
+			element.addEventListener('touchmove', touchMove);
+			element.addEventListener('touchend', watchTouches);
+			element.addEventListener('touchcancel', watchTouches);
+		} else if (gesture) {
+			endGesture(gesture);
+			gesture = null;
+			element.removeEventListener('touchmove', touchMove);
+			element.removeEventListener('touchend', watchTouches);
+			element.removeEventListener('touchcancel', watchTouches);
 		}
 	});
-};
 
-export { okzoomer, normalizeWheel, keyMonitor };
+	if (
+		typeof GestureEvent !== 'undefined' &&
+		typeof TouchEvent === 'undefined'
+	) {
+		element.addEventListener('gesturestart', function handleGestureStart(e) {
+			startGesture({
+				scale: e.scale,
+				rotation: e.rotation,
+				origin: origin(element, [e.clientX, e.clientY])
+			});
+			e.preventDefault();
+		});
+		element.addEventListener('gesturechange', function handleGestureChange(e) {
+			doGesture({
+				scale: e.scale,
+				rotation: e.rotation,
+				origin: origin(element, [e.clientX, e.clientY])
+			});
+			e.preventDefault();
+		});
+		element.addEventListener('gestureend', function handleGestureEnd(e) {
+			endGesture({
+				scale: e.scale,
+				rotation: e.rotation,
+				origin: origin(element, [e.clientX, e.clientY])
+			});
+		});
+	}
+}
