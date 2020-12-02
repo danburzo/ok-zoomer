@@ -1,4 +1,5 @@
-const WHEEL_SPEEDUP = 2;
+const WHEEL_SCALE_SPEEDUP = 2;
+const WHEEL_TRANSLATION_SPEEDUP = 2;
 const DELTA_LINE_MULTIPLIER = 8;
 const DELTA_PAGE_MULTIPLIER = 24;
 const MAX_WHEEL_DELTA = 24;
@@ -27,40 +28,43 @@ function limit(delta, max_delta) {
 
 function midpoint(touches) {
 	let [t1, t2] = touches;
-	return [(t1.clientX + t2.clientX) / 2, (t1.clientY + t2.clientY) / 2];
+	return {
+		x: (t1.clientX + t2.clientX) / 2, 
+		y: (t1.clientY + t2.clientY) / 2
+	};
 }
 
 function distance(touches) {
 	let [t1, t2] = touches;
 	let dx = t2.clientX - t1.clientX;
-	let dy = t2.clientY - t2.clientY;
+	let dy = t2.clientY - t1.clientY;
 	return Math.sqrt(dx * dx + dy * dy);
 }
 
 function angle(touches) {
 	let [t1, t2] = touches;
 	let dx = t2.clientX - t1.clientX;
-	let dy = t2.clientY - t2.clientY;
+	let dy = t2.clientY - t1.clientY;
 	return (180 / Math.PI) * Math.atan2(dy, dx);
 }
 
 function clientToHTMLElementCoords(element, coords) {
 	let rect = element.getBoundingClientRect();
 	return {
-		x: coords[0] - rect.x,
-		y: coords[1] - rect.y
+		x: coords.x - rect.x,
+		y: coords.y - rect.y
 	};
 }
 
 function clientToSVGElementCoords(element, coords) {
 	let screen_to_el = element.getScreenCTM().inverse();
 	let point = element.ownerSVGElement.createSVGPoint();
-	point.x = coords[0];
-	point.y = coords[1];
+	point.x = coords.x;
+	point.y = coords.y;
 	return point.matrixTransform(screen_to_el);
 }
 
-export default function okzoomer(element, opts) {
+function okzoomer(container, opts) {
 	function noop() {
 		/* do nothing */
 	}
@@ -75,28 +79,24 @@ export default function okzoomer(element, opts) {
 	let gesture = false;
 	let timer;
 
-	let origin;
-	if (element instanceof HTMLElement) {
-		origin = clientToHTMLElementCoords;
-	} else if (element instanceof SVGElement) {
-		origin = clientToSVGElementCoords;
-	} else {
-		throw new Error('unsupported element type, expecting HTML or SVG');
-	}
-
 	document.addEventListener('wheel', function wheelListener(e) {
 		e.preventDefault();
-		let [, dy] = normalizeWheel(e);
+		let [dx, dy] = normalizeWheel(e);
 		if (!gesture) {
 			gesture = {
 				scale: 1,
-				origin: origin(element, [e.clientX, e.clientY])
+				translation: { x: 0, y: 0 },
+				origin: { x: e.clientX, y: e.clientY }
 			};
 			startGesture(gesture);
 		} else {
 			gesture = {
-				scale: gesture.scale * (1 - (WHEEL_SPEEDUP * dy) / 100),
-				origin: origin(element, [e.clientX, e.clientY])
+				origin: { x: e.clientX, y: e.clientY },
+				scale: e.ctrlKey ? gesture.scale * (1 - (WHEEL_SCALE_SPEEDUP * dy) / 100) : 1,
+				translation: !e.ctrlKey ? { 
+					x: gesture.translation.x - WHEEL_TRANSLATION_SPEEDUP * dx, 
+					y: gesture.translation.y - WHEEL_TRANSLATION_SPEEDUP * dy
+				} : { x: 0, y: 0 }
 			};
 			doGesture(gesture);
 		}
@@ -109,6 +109,8 @@ export default function okzoomer(element, opts) {
 				gesture = null;
 			}
 		}, 200);
+	}, {
+		passive: false
 	});
 
 	let initial_touches;
@@ -117,35 +119,51 @@ export default function okzoomer(element, opts) {
 			let mp_init = midpoint(initial_touches);
 			let mp_curr = midpoint(e.touches);
 			gesture = {
-				scale: distance(e.touches) / distance(initial_touches),
-				rotation: angle(e.touches) - angle(initial_touches),
-				translation: [mp_curr.x - mp_init.x, mp_curr.y - mp_init.y],
-				origin: origin(element, mp_init)
+				scale: e.scale !== undefined ? e.scale : distance(e.touches) / distance(initial_touches),
+				rotation: e.rotation !== undefined ? e.rotation : angle(e.touches) - angle(initial_touches),
+				translation: { 
+					x: mp_curr.x - mp_init.x, 
+					y: mp_curr.y - mp_init.y
+				},
+				origin: mp_init
 			};
 			doGesture(gesture);
 			e.preventDefault();
 		}
 	}
 
-	element.addEventListener('touchstart', function watchTouches(e) {
+	container.addEventListener('touchstart', function watchTouches(e) {
 		if (e.touches.length === 2) {
+			initial_touches = e.touches;
 			gesture = {
 				scale: 1,
 				rotation: 0,
-				translation: [0, 0],
-				origin: origin(element, midpoint(initial_touches))
+				translation: { x: 0, y: 0 },
+				origin: midpoint(initial_touches)
 			};
 			e.preventDefault();
 			startGesture(gesture);
-			element.addEventListener('touchmove', touchMove);
-			element.addEventListener('touchend', watchTouches);
-			element.addEventListener('touchcancel', watchTouches);
+			container.addEventListener('touchmove', touchMove, {
+				passive: false
+			});
+			container.addEventListener('touchend', watchTouches, {
+				passive: false
+			});
+			container.addEventListener('touchcancel', watchTouches, {
+				passive: false
+			});
 		} else if (gesture) {
 			endGesture(gesture);
 			gesture = null;
-			element.removeEventListener('touchmove', touchMove);
-			element.removeEventListener('touchend', watchTouches);
-			element.removeEventListener('touchcancel', watchTouches);
+			container.removeEventListener('touchmove', touchMove, {
+				passive: false
+			});
+			container.removeEventListener('touchend', watchTouches, {
+				passive: false
+			});
+			container.removeEventListener('touchcancel', watchTouches, {
+				passive: false
+			});
 		}
 	});
 
@@ -153,28 +171,39 @@ export default function okzoomer(element, opts) {
 		typeof GestureEvent !== 'undefined' &&
 		typeof TouchEvent === 'undefined'
 	) {
-		element.addEventListener('gesturestart', function handleGestureStart(e) {
+		container.addEventListener('gesturestart', function handleGestureStart(e) {
 			startGesture({
+				translation: { x: 0, y: 0 },
 				scale: e.scale,
 				rotation: e.rotation,
-				origin: origin(element, [e.clientX, e.clientY])
+				origin: { x: e.clientX, y: e.clientY }
 			});
 			e.preventDefault();
-		});
-		element.addEventListener('gesturechange', function handleGestureChange(e) {
+		}, {
+		passive: false
+	});
+		container.addEventListener('gesturechange', function handleGestureChange(e) {
 			doGesture({
+				translation: { x: 0, y: 0 },
 				scale: e.scale,
 				rotation: e.rotation,
-				origin: origin(element, [e.clientX, e.clientY])
+				origin: { x: e.clientX, y: e.clientY }
 			});
 			e.preventDefault();
-		});
-		element.addEventListener('gestureend', function handleGestureEnd(e) {
+		}, {
+		passive: false
+	});
+		container.addEventListener('gestureend', function handleGestureEnd(e) {
 			endGesture({
+				translation: { x: 0, y: 0 },
 				scale: e.scale,
 				rotation: e.rotation,
-				origin: origin(element, [e.clientX, e.clientY])
+				origin: { x: e.clientX, y: e.clientY }
 			});
-		});
+		}, {
+		passive: false
+	});
 	}
 }
+
+export { okzoomer, clientToHTMLElementCoords, clientToSVGElementCoords };
