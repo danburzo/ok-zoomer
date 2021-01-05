@@ -68,10 +68,11 @@
 			let current_ctm;
 			let origin;
 			
-			let rect = el.getBoundingClientRect();
-			
 			okzoomer(container, {
 				startGesture(gesture) {
+					el.style.transform = '';
+					let rect = el.getBoundingClientRect();
+					el.style.transform = initial_ctm.toString();
 					origin = {
 						x: gesture.origin.x - rect.x,
 						y: gesture.origin.y - rect.y
