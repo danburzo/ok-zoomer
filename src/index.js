@@ -141,6 +141,10 @@ function okzoomer(container, opts) {
 				translation: { x: 0, y: 0 },
 				origin: midpoint(initial_touches)
 			};
+			/*
+				All the other events using `watchTouches` are passive,
+				we don't need to call preventDefault().
+			 */
 			if (e.type === 'touchstart') {
 				e.preventDefault();
 			}
@@ -169,9 +173,7 @@ function okzoomer(container, opts) {
 				origin: { x: e.clientX, y: e.clientY }
 			});
 			e.preventDefault();
-		}, {
-		passive: false
-	});
+		}, { passive: false });
 		container.addEventListener('gesturechange', function handleGestureChange(e) {
 			doGesture({
 				translation: { x: 0, y: 0 },
@@ -180,9 +182,7 @@ function okzoomer(container, opts) {
 				origin: { x: e.clientX, y: e.clientY }
 			});
 			e.preventDefault();
-		}, {
-		passive: false
-	});
+		}, { passive: false });
 		container.addEventListener('gestureend', function handleGestureEnd(e) {
 			endGesture({
 				translation: { x: 0, y: 0 },
