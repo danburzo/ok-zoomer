@@ -141,31 +141,21 @@ function okzoomer(container, opts) {
 				translation: { x: 0, y: 0 },
 				origin: midpoint(initial_touches)
 			};
-			e.preventDefault();
+			if (e.type === 'touchstart') {
+				e.preventDefault();
+			}
 			startGesture(gesture);
-			container.addEventListener('touchmove', touchMove, {
-				passive: false
-			});
-			container.addEventListener('touchend', watchTouches, {
-				passive: false
-			});
-			container.addEventListener('touchcancel', watchTouches, {
-				passive: false
-			});
+			container.addEventListener('touchmove', touchMove, { passive: false });
+			container.addEventListener('touchend', watchTouches);
+			container.addEventListener('touchcancel', watchTouches);
 		} else if (gesture) {
 			endGesture(gesture);
 			gesture = null;
-			container.removeEventListener('touchmove', touchMove, {
-				passive: false
-			});
-			container.removeEventListener('touchend', watchTouches, {
-				passive: false
-			});
-			container.removeEventListener('touchcancel', watchTouches, {
-				passive: false
-			});
+			container.removeEventListener('touchmove', touchMove);
+			container.removeEventListener('touchend', watchTouches);
+			container.removeEventListener('touchcancel', watchTouches);
 		}
-	});
+	}, { passive: false });
 
 	if (
 		typeof GestureEvent !== 'undefined' &&
@@ -200,9 +190,7 @@ function okzoomer(container, opts) {
 				rotation: e.rotation,
 				origin: { x: e.clientX, y: e.clientY }
 			});
-		}, {
-		passive: false
-	});
+		});
 	}
 }
 

@@ -42,29 +42,31 @@
 			<div id="target">Gesture target</div>
 		</div>
 		<script type="module">
-			import { okzoomer, clientToHTMLElementCoords } from '../src/index.js';
+			import { okzoomer } from '../src/index.js';
 			let el = document.querySelector('#target');
 			let container = document.querySelector('#container');
 			const clamp = v => Math.max(0.04, Math.min(32, v));
 
-			let Ctr = DOMMatrix || WebKitCSSMatrix;
-
-			let initial_ctm = new Ctr();
-
-			let current_ctm, origin;
+			let Matrix = typeof DOMMatrix !== 'undefined' ? DOMMatrix : typeof WebKitCSSMatrix !== 'undefined' ? WebKitCSSMatrix : null;
+			if (!Matrix) {
+				throw new Error("Couldn't find a DOM Matrix implementation");
+			}
 
 			function applyGesture(gesture) {
-				current_ctm = new Ctr()
+				current_ctm = new Matrix()
 					.translate(origin.x, origin.y)
 					.translate(gesture.translation.x || 0, gesture.translation.y || 0)
-					.scale(gesture.scale || 1)
 					.rotate(gesture.rotation || 0)
+					.scale(gesture.scale || 1)
 					.translate(-origin.x, -origin.y)
 					.multiply(initial_ctm);
 				el.style.transform = current_ctm.toString();
-				el.style.transformOrigin = '0 0';
 			}
 
+			el.style.transformOrigin = '0 0';
+			let initial_ctm = new Matrix();
+			let current_ctm;
+			let origin;
 			let rect = el.getBoundingClientRect();
 			okzoomer(container, {
 				startGesture(gesture) {
@@ -74,10 +76,10 @@
 					};
 					applyGesture(gesture);
 				},
-				doGesture(gesture = {}) {
+				doGesture(gesture) {
 					applyGesture(gesture);
 				},
-				endGesture(gesture = {}) {
+				endGesture(gesture) {
 					applyGesture(gesture);
 					initial_ctm = current_ctm;
 				}
