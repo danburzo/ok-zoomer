@@ -70,9 +70,15 @@
 			
 			okzoomer(container, {
 				startGesture(gesture) {
+					/*
+						Clear the element's transform so we can 
+						measure its original position wrt. the screen.
+
+						(We don't need to restore it because it gets 
+						overwritten by `applyGesture()` anyways.)
+					 */
 					el.style.transform = '';
 					let rect = el.getBoundingClientRect();
-					el.style.transform = initial_ctm.toString();
 					origin = {
 						x: gesture.origin.x - rect.x,
 						y: gesture.origin.y - rect.y
