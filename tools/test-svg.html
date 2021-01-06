@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>OK Zoomer Test</title>
+		<meta charset="utf-8">
+		<meta name='viewport' content='width=device-width,initial-scale=1'>
+		<style type="text/css">
+
+			body {
+				margin: 0;
+				padding: 0;
+				background: lightgray;
+			}
+
+			#container {
+				position: absolute;
+				top: 2em;
+				left: 2em;
+				width: calc(100% - 4em);
+				height: calc(100% - 4em);
+				border: 1px solid;
+				background: white;
+				overflow: hidden;
+				border-radius: 1em;
+			}
+
+		</style>
+	</head>
+	<body>
+		<svg id='container'>
+			<g id="target">
+				<rect width='400' height='200' fill='tomato'></rect>
+				<text dx='150' dy='100'>Gesture target</text>
+			</g>
+		</svg>
+		<script type="module">
+			import { okzoomer } from '../src/index.js';
+			let el = document.querySelector('#target');
+			let container = document.querySelector('#container');
+			const clamp = v => Math.max(0.04, Math.min(32, v));
+
+			let Matrix = typeof DOMMatrix !== 'undefined' ? DOMMatrix : typeof WebKitCSSMatrix !== 'undefined' ? WebKitCSSMatrix : null;
+			if (!Matrix) {
+				throw new Error("Couldn't find a DOM Matrix implementation");
+			}
+
+			function applyGesture(gesture) {
+				current_ctm = new Matrix()
+					.translate(origin.x, origin.y)
+					.translate(gesture.translation.x || 0, gesture.translation.y || 0)
+					.rotate(gesture.rotation || 0)
+					.scale(gesture.scale || 1)
+					.translate(-origin.x, -origin.y)
+					.multiply(initial_ctm);
+				let t = el.transform.baseVal.createSVGTransformFromMatrix(current_ctm);
+				el.transform.baseVal.initialize(t);
+			}
+
+			let initial_ctm = new Matrix();
+			let current_ctm;
+			let origin;
+			
+			okzoomer(container, {
+				startGesture(gesture) {
+					let pt = container.createSVGPoint(gesture.origin.x, gesture.origin.y);
+					pt.x = gesture.origin.x;
+					pt.y = gesture.origin.y; 
+					origin = pt.matrixTransform(container.getScreenCTM().inverse());
+					applyGesture(gesture);
+				},
+				doGesture(gesture) {
+					applyGesture(gesture);
+				},
+				endGesture(gesture) {
+					applyGesture(gesture);
+					initial_ctm = current_ctm;
+				}
+			});
+		</script>
+	</body>
+</html>
