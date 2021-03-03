@@ -2,10 +2,13 @@
 	"name": "ok-zoomer",
 	"version": "1.0.0",
 	"description": "Okay ways to pinch-zoom on the web.",
-	"main": "index.js",
+	"main": "lib",
+	"type": "module",
 	"scripts": {
-		"lint": "eslint 'src/**/*.js'",
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"lint": "eslint 'src/**/*.ts'",
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"prepare": "tsc",
+		"compile": "tsc"
 	},
 	"repository": {
 		"type": "git",
@@ -18,14 +21,20 @@
 	},
 	"homepage": "https://github.com/danburzo/ok-zoomer#readme",
 	"devDependencies": {
+		"@typescript-eslint/eslint-plugin": "^4.16.1",
+		"@typescript-eslint/parser": "^4.16.1",
 		"eslint": "^7.14.0",
 		"husky": "^4.3.0",
 		"prettier": "2.2.1",
-		"pretty-quick": "^3.1.0"
+		"pretty-quick": "^3.1.0",
+		"typescript": "^4.2.2"
 	},
 	"husky": {
 		"hooks": {
 			"pre-commit": "pretty-quick --staged"
 		}
-	}
+	},
+	"files": [
+		"lib"
+	]
 }
