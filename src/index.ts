@@ -33,7 +33,7 @@ declare global {
 	}
 	// required to check for its existence
 	interface Window {
-		GestureEvent: any;
+		GestureEvent?: GestureEvent;
 	}
 }
 
@@ -47,6 +47,12 @@ export type Gesture = {
 export type Coords = {
 	x: number;
 	y: number;
+};
+
+type Callbacks = {
+	startGesture?: (gesture: Gesture) => void;
+	doGesture?: (gesture: Gesture) => void;
+	endGesture?: (gesture: Gesture) => void;
 };
 
 const WHEEL_SCALE_SPEEDUP = 2;
@@ -78,8 +84,7 @@ function limit(delta: number, max_delta: number): number {
 }
 
 function midpoint(touches: TouchList): Coords {
-	const t1 = touches[0];
-	const t2 = touches[1];
+	const [t1, t2] = touches;
 	return {
 		x: (t1.clientX + t2.clientX) / 2,
 		y: (t1.clientY + t2.clientY) / 2
@@ -87,16 +92,14 @@ function midpoint(touches: TouchList): Coords {
 }
 
 function distance(touches: TouchList): number {
-	const t1 = touches[0];
-	const t2 = touches[1];
+	const [t1, t2] = touches;
 	const dx = t2.clientX - t1.clientX;
 	const dy = t2.clientY - t1.clientY;
 	return Math.sqrt(dx * dx + dy * dy);
 }
 
 function angle(touches: TouchList): number {
-	const t1 = touches[0];
-	const t2 = touches[1];
+	const [t1, t2] = touches;
 	const dx = t2.clientX - t1.clientX;
 	const dy = t2.clientY - t1.clientY;
 	return (180 / Math.PI) * Math.atan2(dy, dx);
@@ -125,13 +128,7 @@ export function clientToSVGElementCoords(
 	return point.matrixTransform(screen_to_el);
 }
 
-type Options = {
-	startGesture?: (gesture: Gesture) => void;
-	doGesture?: (gesture: Gesture) => void;
-	endGesture?: (gesture: Gesture) => void;
-};
-
-export function okzoomer(container: Element, options: Options): () => void {
+export function okzoomer(container: Element, options: Callbacks): () => void {
 	function noop() {
 		/* do nothing */
 	}
@@ -290,8 +287,8 @@ export function okzoomer(container: Element, options: Options): () => void {
 		document.removeEventListener('wheel', wheelListener);
 		container.removeEventListener('touchstart', watchTouches);
 		if (
-			navigator.userAgent.toLowerCase().indexOf('safari') !== -1 &&
-			typeof TouchEvent === 'undefined'
+			typeof window.GestureEvent !== 'undefined' &&
+			typeof window.TouchEvent === 'undefined'
 		) {
 			container.removeEventListener('gesturestart', handleGestureStart);
 			container.removeEventListener('gesturechange', handleGestureChange);
