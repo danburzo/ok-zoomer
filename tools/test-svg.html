@@ -35,47 +35,42 @@
 			</g>
 		</svg>
 		<script type="module">
-			import okzoomer from '../src/index.js';
-			let el = document.querySelector('#target');
-			let container = document.querySelector('#container');
-			const clamp = v => Math.max(0.04, Math.min(32, v));
+			import { 
+				okzoomer, 
+				gestureToMatrix, 
+				getOrigin, 
+				applyMatrix 
+			} from '../src/index.js';
 
-			let Matrix = window.DOMMatrix || window.WebKitCSSMatrix;
-			if (!Matrix) {
-				throw new Error("Couldn't find a DOM Matrix implementation");
+			if (!window.DOMMatrix) {
+				if (window.WebKitCSSMatrix) {
+					window.DOMMatrix = window.WebKitCSSMatrix;
+				} else {
+					throw new Error("Couldn't find a DOM Matrix implementation");
+				}
 			}
-
-			function applyGesture(gesture) {
-				current_ctm = new Matrix()
-					.translate(origin.x, origin.y)
-					.translate(gesture.translation.x || 0, gesture.translation.y || 0)
-					.rotate(gesture.rotation || 0)
-					.scale(gesture.scale || 1)
-					.translate(-origin.x, -origin.y)
-					.multiply(initial_ctm);
-				let tlist = el.transform.baseVal; 
-				let t = tlist.createSVGTransformFromMatrix(current_ctm);
-				tlist.initialize(t);
-			}
-
-			let initial_ctm = new Matrix();
-			let current_ctm;
-			let origin;
 			
-			okzoomer(container, {
+			let origin;
+			let initial_ctm = new DOMMatrix();
+			let el = document.querySelector('#target');
+			
+			okzoomer(document.querySelector('#container'), {
 				startGesture(gesture) {
-					let pt = container.createSVGPoint(gesture.origin.x, gesture.origin.y);
-					pt.x = gesture.origin.x;
-					pt.y = gesture.origin.y; 
-					origin = pt.matrixTransform(container.getScreenCTM().inverse());
-					applyGesture(gesture);
+					origin = getOrigin(el, gesture);
+					applyMatrix(
+						el, 
+						gestureToMatrix(gesture, origin).multiply(initial_ctm)
+					);
 				},
 				doGesture(gesture) {
-					applyGesture(gesture);
+					applyMatrix(
+						el, 
+						gestureToMatrix(gesture, origin).multiply(initial_ctm)
+					);
 				},
 				endGesture(gesture) {
-					applyGesture(gesture);
-					initial_ctm = current_ctm;
+					initial_ctm = gestureToMatrix(gesture, origin).multiply(initial_ctm);
+					applyMatrix(el, initial_ctm);
 				}
 			});
 		</script>

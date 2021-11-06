@@ -178,4 +178,48 @@ function okzoomer(container, opts) {
 	}
 }
 
-export default okzoomer;
+function gestureToMatrix(gesture, origin) {
+	return new DOMMatrix()
+		.translate(origin.x, origin.y)
+		.translate(gesture.translation.x || 0, gesture.translation.y || 0)
+		.rotate(gesture.rotation || 0)
+		.scale(gesture.scale || 1)
+		.translate(-origin.x, -origin.y);
+}
+
+function getOrigin(el, gesture) {
+	if (el instanceof HTMLElement) {
+		let rect = el.getBoundingClientRect();
+		return {
+			x: gesture.origin.x - rect.x,
+			y: gesture.origin.y - rect.y
+		}
+	} else if (el instanceof SVGElement) {
+		let svgEl = el.ownerSVGElement;
+		let pt = svgEl.createSVGPoint();
+		pt.x = gesture.origin.x;
+		pt.y = gesture.origin.y; 
+		return pt.matrixTransform(svgEl.getScreenCTM().inverse());
+	} else {
+		throw new Error('Expected HTML or SVG element');
+	}
+};
+
+function applyMatrix(el, matrix) {
+	if (el instanceof HTMLElement) {
+		el.style.transform = matrix.toString();
+	} else if (el instanceof SVGElement) {
+		let transformList = el.transform.baseVal; 
+		let transform = transformList.createSVGTransformFromMatrix(matrix);
+		transformList.initialize(transform);
+	} else {
+		throw new Error('Expected HTML or SVG element');
+	}
+}
+
+export { 
+	okzoomer, 
+	gestureToMatrix, 
+	getOrigin,
+	applyMatrix
+};
