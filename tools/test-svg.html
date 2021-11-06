@@ -22,6 +22,7 @@
 				background: white;
 				overflow: hidden;
 				border-radius: 1em;
+				touch-action: none;
 			}
 
 		</style>
@@ -34,12 +35,12 @@
 			</g>
 		</svg>
 		<script type="module">
-			import { okzoomer } from '../src/index.js';
+			import okzoomer from '../src/index.js';
 			let el = document.querySelector('#target');
 			let container = document.querySelector('#container');
 			const clamp = v => Math.max(0.04, Math.min(32, v));
 
-			let Matrix = typeof DOMMatrix !== 'undefined' ? DOMMatrix : typeof WebKitCSSMatrix !== 'undefined' ? WebKitCSSMatrix : null;
+			let Matrix = window.DOMMatrix || window.WebKitCSSMatrix;
 			if (!Matrix) {
 				throw new Error("Couldn't find a DOM Matrix implementation");
 			}
@@ -52,8 +53,9 @@
 					.scale(gesture.scale || 1)
 					.translate(-origin.x, -origin.y)
 					.multiply(initial_ctm);
-				let t = el.transform.baseVal.createSVGTransformFromMatrix(current_ctm);
-				el.transform.baseVal.initialize(t);
+				let tlist = el.transform.baseVal; 
+				let t = tlist.createSVGTransformFromMatrix(current_ctm);
+				tlist.initialize(t);
 			}
 
 			let initial_ctm = new Matrix();

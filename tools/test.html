@@ -22,6 +22,7 @@
 				background: white;
 				overflow: hidden;
 				border-radius: 1em;
+				touch-action: none;
 			}
 
 			#target {
@@ -32,8 +33,6 @@
 				top: calc(50% - 100px);
 				left: calc(50% - 200px);
 				font-size: 2em;
-				/*padding: 1em;*/
-				/*border: 0.5em solid rgba(0,0,0,0.1);*/
 			}
 		</style>
 	</head>
@@ -42,12 +41,12 @@
 			<div id="target">Gesture target</div>
 		</div>
 		<script type="module">
-			import { okzoomer } from '../src/index.js';
+			import okzoomer from '../src/index.js';
 			let el = document.querySelector('#target');
 			let container = document.querySelector('#container');
 			const clamp = v => Math.max(0.04, Math.min(32, v));
 
-			let Matrix = typeof DOMMatrix !== 'undefined' ? DOMMatrix : typeof WebKitCSSMatrix !== 'undefined' ? WebKitCSSMatrix : null;
+			let Matrix = window.DOMMatrix || window.WebKitCSSMatrix;
 			if (!Matrix) {
 				throw new Error("Couldn't find a DOM Matrix implementation");
 			}

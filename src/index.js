@@ -48,22 +48,6 @@ function angle(touches) {
 	return (180 / Math.PI) * Math.atan2(dy, dx);
 }
 
-function clientToHTMLElementCoords(element, coords) {
-	let rect = element.getBoundingClientRect();
-	return {
-		x: coords.x - rect.x,
-		y: coords.y - rect.y
-	};
-}
-
-function clientToSVGElementCoords(element, coords) {
-	let screen_to_el = element.getScreenCTM().inverse();
-	let point = element.ownerSVGElement.createSVGPoint();
-	point.x = coords.x;
-	point.y = coords.y;
-	return point.matrixTransform(screen_to_el);
-}
-
 function okzoomer(container, opts) {
 	function noop() {
 		/* do nothing */
@@ -103,7 +87,7 @@ function okzoomer(container, opts) {
 		if (timer) {
 			window.clearTimeout(timer);
 		}
-		timer = window.setTimeout(() => {
+		timer = window.setTimeout(function() {
 			if (gesture) {
 				endGesture(gesture);
 				gesture = null;
@@ -194,4 +178,4 @@ function okzoomer(container, opts) {
 	}
 }
 
-export { okzoomer, clientToHTMLElementCoords, clientToSVGElementCoords };
+export default okzoomer;
