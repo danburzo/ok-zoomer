@@ -4,13 +4,15 @@ const DELTA_LINE_MULTIPLIER = 8;
 const DELTA_PAGE_MULTIPLIER = 24;
 const MAX_WHEEL_DELTA = 24;
 
+function limit(delta, max_delta) {
+	return Math.sign(delta) * Math.min(max_delta, Math.abs(delta));
+}
+
 function normalizeWheel(e) {
 	let dx = e.deltaX;
 	let dy = e.deltaY;
 	if (e.shiftKey && dx === 0) {
-		let tmp = dx;
-		dx = dy;
-		dy = tmp;
+		[dx, dy] = [dy, dx];
 	}
 	if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
 		dx *= DELTA_LINE_MULTIPLIER;
@@ -20,10 +22,6 @@ function normalizeWheel(e) {
 		dy *= DELTA_PAGE_MULTIPLIER;
 	}
 	return [limit(dx, MAX_WHEEL_DELTA), limit(dy, MAX_WHEEL_DELTA)];
-}
-
-function limit(delta, max_delta) {
-	return Math.sign(delta) * Math.min(max_delta, Math.abs(delta));
 }
 
 function midpoint(touches) {
@@ -36,16 +34,14 @@ function midpoint(touches) {
 
 function distance(touches) {
 	let [t1, t2] = touches;
-	let dx = t2.clientX - t1.clientX;
-	let dy = t2.clientY - t1.clientY;
-	return Math.sqrt(dx * dx + dy * dy);
+	return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t2.clientY);
 }
 
 function angle(touches) {
 	let [t1, t2] = touches;
 	let dx = t2.clientX - t1.clientX;
-	let dy = t2.clientY - t1.clientY;
-	return (180 / Math.PI) * Math.atan2(dy, dx);
+	let dy = t2.clientY - t2.clientY;
+	return Math.atan2(dy, dx) * 180 / Math.PI;
 }
 
 function okzoomer(container, opts) {
@@ -60,28 +56,37 @@ function okzoomer(container, opts) {
 	let endGesture = options.endGesture || noop;
 
 	// TODO: we shouldn't be reusing gesture
-	let gesture = false;
+	let gesture = null;
 	let timer;
-
-	document.addEventListener('wheel', function wheelListener(e) {
+	container.addEventListener('wheel', function wheelListener(e) {
 		e.preventDefault();
 		let [dx, dy] = normalizeWheel(e);
 		if (!gesture) {
 			gesture = {
+				origin: { x: e.clientX, y: e.clientY },
 				scale: 1,
-				translation: { x: 0, y: 0 },
-				origin: { x: e.clientX, y: e.clientY }
+				translation: { x: 0, y: 0 }
 			};
 			startGesture(gesture);
 		} else {
-			gesture = {
-				origin: { x: e.clientX, y: e.clientY },
-				scale: e.ctrlKey ? gesture.scale * (1 - (WHEEL_SCALE_SPEEDUP * dy) / 100) : 1,
-				translation: !e.ctrlKey ? { 
-					x: gesture.translation.x - WHEEL_TRANSLATION_SPEEDUP * dx, 
-					y: gesture.translation.y - WHEEL_TRANSLATION_SPEEDUP * dy
-				} : { x: 0, y: 0 }
-			};
+			if (e.ctrlKey) {
+				// pinch-zoom
+				gesture = {
+					origin: { x: e.clientX, y: e.clientY },
+					scale: gesture.scale * (1 - (WHEEL_SCALE_SPEEDUP * dy) / 100),
+					translation: { x: 0, y: 0 }
+				};
+			} else {
+				// panning
+				gesture = {
+					origin: { x: e.clientX, y: e.clientY },
+					scale: 1,
+					translation: { 
+						x: gesture.translation.x - WHEEL_TRANSLATION_SPEEDUP * dx, 
+						y: gesture.translation.y - WHEEL_TRANSLATION_SPEEDUP * dy
+					}
+				};
+			}
 			doGesture(gesture);
 		}
 		if (timer) {
@@ -125,10 +130,6 @@ function okzoomer(container, opts) {
 				translation: { x: 0, y: 0 },
 				origin: midpoint(initial_touches)
 			};
-			/*
-				All the other events using `watchTouches` are passive,
-				we don't need to call preventDefault().
-			 */
 			if (e.type === 'touchstart') {
 				e.preventDefault();
 			}
@@ -207,11 +208,12 @@ function getOrigin(el, gesture) {
 
 function applyMatrix(el, matrix) {
 	if (el instanceof HTMLElement) {
-		el.style.transform = matrix.toString();
+		el.style.transform = matrix;
 	} else if (el instanceof SVGElement) {
-		let transformList = el.transform.baseVal; 
-		let transform = transformList.createSVGTransformFromMatrix(matrix);
-		transformList.initialize(transform);
+		// let transformList = el.transform.baseVal; 
+		// let transform = transformList.createSVGTransformFromMatrix(matrix);
+		// transformList.initialize(transform);
+		el.setAttribute('transform', matrix);
 	} else {
 		throw new Error('Expected HTML or SVG element');
 	}
