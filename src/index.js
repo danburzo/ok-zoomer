@@ -55,47 +55,48 @@ function okzoomer(container, opts) {
 	let doGesture = options.doGesture || noop;
 	let endGesture = options.endGesture || noop;
 
-	// TODO: we shouldn't be reusing gesture
-	let gesture = null;
+	let wheel_gesture = null;
 	let timer;
 	container.addEventListener('wheel', function wheelListener(e) {
-		e.preventDefault();
+		if (e.cancelable !== false) {
+			e.preventDefault();
+		}
 		let [dx, dy] = normalizeWheel(e);
-		if (!gesture) {
-			gesture = {
+		if (!wheel_gesture) {
+			wheel_gesture = {
 				origin: { x: e.clientX, y: e.clientY },
 				scale: 1,
 				translation: { x: 0, y: 0 }
 			};
-			startGesture(gesture);
+			startGesture(wheel_gesture);
 		} else {
 			if (e.ctrlKey) {
 				// pinch-zoom
-				gesture = {
+				wheel_gesture = {
 					origin: { x: e.clientX, y: e.clientY },
-					scale: gesture.scale * (1 - (WHEEL_SCALE_SPEEDUP * dy) / 100),
+					scale: wheel_gesture.scale * (1 - (WHEEL_SCALE_SPEEDUP * dy) / 100),
 					translation: { x: 0, y: 0 }
 				};
 			} else {
 				// panning
-				gesture = {
+				wheel_gesture = {
 					origin: { x: e.clientX, y: e.clientY },
 					scale: 1,
 					translation: { 
-						x: gesture.translation.x - WHEEL_TRANSLATION_SPEEDUP * dx, 
-						y: gesture.translation.y - WHEEL_TRANSLATION_SPEEDUP * dy
+						x: wheel_gesture.translation.x - WHEEL_TRANSLATION_SPEEDUP * dx, 
+						y: wheel_gesture.translation.y - WHEEL_TRANSLATION_SPEEDUP * dy
 					}
 				};
 			}
-			doGesture(gesture);
+			doGesture(wheel_gesture);
 		}
 		if (timer) {
 			window.clearTimeout(timer);
 		}
 		timer = window.setTimeout(function() {
-			if (gesture) {
-				endGesture(gesture);
-				gesture = null;
+			if (wheel_gesture) {
+				endGesture(wheel_gesture);
+				wheel_gesture = null;
 			}
 		}, 200);
 	}, {
@@ -103,11 +104,12 @@ function okzoomer(container, opts) {
 	});
 
 	let initial_touches;
+	let touch_gesture = null;
 	function touchMove(e) {
 		if (e.touches.length === 2) {
 			let mp_init = midpoint(initial_touches);
 			let mp_curr = midpoint(e.touches);
-			gesture = {
+			touch_gesture = {
 				scale: e.scale !== undefined ? e.scale : distance(e.touches) / distance(initial_touches),
 				rotation: e.rotation !== undefined ? e.rotation : angle(e.touches) - angle(initial_touches),
 				translation: { 
@@ -116,30 +118,32 @@ function okzoomer(container, opts) {
 				},
 				origin: mp_init
 			};
-			doGesture(gesture);
-			e.preventDefault();
+			doGesture(touch_gesture);
+			if (e.cancelable !== false) {
+				e.preventDefault();
+			}
 		}
 	}
 
 	container.addEventListener('touchstart', function watchTouches(e) {
 		if (e.touches.length === 2) {
 			initial_touches = e.touches;
-			gesture = {
+			touch_gesture = {
 				scale: 1,
 				rotation: 0,
 				translation: { x: 0, y: 0 },
 				origin: midpoint(initial_touches)
 			};
-			if (e.type === 'touchstart') {
+			if (e.type === 'touchstart' && e.cancelable !== false) {
 				e.preventDefault();
 			}
-			startGesture(gesture);
+			startGesture(touch_gesture);
 			container.addEventListener('touchmove', touchMove, { passive: false });
 			container.addEventListener('touchend', watchTouches);
 			container.addEventListener('touchcancel', watchTouches);
-		} else if (gesture) {
-			endGesture(gesture);
-			gesture = null;
+		} else if (touch_gesture) {
+			endGesture(touch_gesture);
+			touch_gesture = null;
 			container.removeEventListener('touchmove', touchMove);
 			container.removeEventListener('touchend', watchTouches);
 			container.removeEventListener('touchcancel', watchTouches);
@@ -150,31 +154,44 @@ function okzoomer(container, opts) {
 		typeof GestureEvent !== 'undefined' &&
 		typeof TouchEvent === 'undefined'
 	) {
+		let in_gesture = false;
 		container.addEventListener('gesturestart', function handleGestureStart(e) {
-			startGesture({
-				translation: { x: 0, y: 0 },
-				scale: e.scale,
-				rotation: e.rotation,
-				origin: { x: e.clientX, y: e.clientY }
-			});
-			e.preventDefault();
+			if (!in_gesture) {
+				startGesture({
+					translation: { x: 0, y: 0 },
+					scale: e.scale,
+					rotation: e.rotation,
+					origin: { x: e.clientX, y: e.clientY }
+				});
+				in_gesture = true;
+			}
+			if (e.cancelable !== false) {
+				e.preventDefault();
+			}
 		}, { passive: false });
 		container.addEventListener('gesturechange', function handleGestureChange(e) {
-			doGesture({
-				translation: { x: 0, y: 0 },
-				scale: e.scale,
-				rotation: e.rotation,
-				origin: { x: e.clientX, y: e.clientY }
-			});
-			e.preventDefault();
+			if (in_gesture) {
+				doGesture({
+					translation: { x: 0, y: 0 },
+					scale: e.scale,
+					rotation: e.rotation,
+					origin: { x: e.clientX, y: e.clientY }
+				});
+			}
+			if (e.cancelable !== false) {
+				e.preventDefault();
+			}
 		}, { passive: false });
 		container.addEventListener('gestureend', function handleGestureEnd(e) {
-			endGesture({
-				translation: { x: 0, y: 0 },
-				scale: e.scale,
-				rotation: e.rotation,
-				origin: { x: e.clientX, y: e.clientY }
-			});
+			if (in_gesture) {
+				endGesture({
+					translation: { x: 0, y: 0 },
+					scale: e.scale,
+					rotation: e.rotation,
+					origin: { x: e.clientX, y: e.clientY }
+				});
+				in_gesture = false;
+			}
 		});
 	}
 }
@@ -195,25 +212,22 @@ function getOrigin(el, gesture) {
 			x: gesture.origin.x - rect.x,
 			y: gesture.origin.y - rect.y
 		}
-	} else if (el instanceof SVGElement) {
-		let svgEl = el.ownerSVGElement;
-		let pt = svgEl.createSVGPoint();
-		pt.x = gesture.origin.x;
-		pt.y = gesture.origin.y; 
-		return pt.matrixTransform(svgEl.getScreenCTM().inverse());
-	} else {
-		throw new Error('Expected HTML or SVG element');
 	}
+	if (el instanceof SVGElement) {
+		let matrix = el.ownerSVGElement.getScreenCTM().inverse();
+		let pt = new DOMPoint(gesture.origin.x, gesture.origin.y); 
+		return pt.matrixTransform(matrix);
+	}
+	throw new Error('Expected HTML or SVG element');
 };
 
 function applyMatrix(el, matrix) {
 	if (el instanceof HTMLElement) {
 		el.style.transform = matrix;
 	} else if (el instanceof SVGElement) {
-		// let transformList = el.transform.baseVal; 
-		// let transform = transformList.createSVGTransformFromMatrix(matrix);
-		// transformList.initialize(transform);
-		el.setAttribute('transform', matrix);
+		let transformList = el.transform.baseVal; 
+		let transform = transformList.createSVGTransformFromMatrix(matrix);
+		transformList.initialize(transform);
 	} else {
 		throw new Error('Expected HTML or SVG element');
 	}

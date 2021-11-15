@@ -146,7 +146,18 @@
 				queue.length = 10;
 
 				stats.innerHTML = queue.join('\n');
-				e.preventDefault();
+
+				/*
+					Safari 15 produces both `gesturechange` and
+					`wheel` events for pinch-zoom gestures.
+
+					When you preventDefault() gesture events, wheel events
+					are not emitted, so let's not do that.
+				 */
+				if (!e.type.match(/^gesture/)) {
+					e.preventDefault();
+					e.stopPropagation();
+				}
 				console.log(e);
 			};
 
