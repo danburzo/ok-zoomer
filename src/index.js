@@ -34,7 +34,7 @@ function midpoint(touches) {
 
 function distance(touches) {
 	let [t1, t2] = touches;
-	return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t2.clientY);
+	return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
 }
 
 function angle(touches) {
