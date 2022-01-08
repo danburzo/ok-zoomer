@@ -40,7 +40,7 @@ function distance(touches) {
 function angle(touches) {
 	let [t1, t2] = touches;
 	let dx = t2.clientX - t1.clientX;
-	let dy = t2.clientY - t2.clientY;
+	let dy = t2.clientY - t1.clientY;
 	return Math.atan2(dy, dx) * 180 / Math.PI;
 }
 
