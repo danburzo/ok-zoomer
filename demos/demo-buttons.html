@@ -39,20 +39,27 @@
 				bottom: 1rem;
 				left: 1rem;
 				z-index: 100;
+				display: flex;
+				right: 1rem;
+			}
+
+			#current-scale {
+				margin-left: auto;
 			}
 		</style>
 	</head>
 	<body>
 		<div id="container">
-			<div id="target">Gesture target</div>
+			<div id="target">Scale me (25% to 400%)</div>
 		</div>
-		<div id='controls'>
-			<button id='zoom-in'>Zoom in</button>
-			<button id='zoom-out'>Zoom out</button>
-			<button class='zoom-exact' data-level='0.5'>50%</button>
-			<button class='zoom-exact' data-level='1'>100%</button>
-			<button class='zoom-exact' data-level='1.5'>150%</button>
-			<button class='zoom-exact' data-level='2'>200%</button>
+		<div id="controls">
+			<button id="zoom-in">Zoom in</button>
+			<button id="zoom-out">Zoom out</button>
+			<button class="zoom-exact" data-level="0.5">50%</button>
+			<button class="zoom-exact" data-level="1">100%</button>
+			<button class="zoom-exact" data-level="1.5">150%</button>
+			<button class="zoom-exact" data-level="2">200%</button>
+			<span id="current-scale"></span>
 		</div>
 		<script type="module">
 			import {
@@ -87,23 +94,24 @@
 						overwritten by `applyMatrix()` anyways.)
 					 */
 					el.style.transform = '';
+					gesture = clampScale(gesture, initial_ctm);
 					origin = getOrigin(el, gesture);
-					applyMatrix(
-						el,
+					applyMatrix(el, 
 						gestureToMatrix(gesture, origin).multiply(initial_ctm)
 					);
 				},
 				doGesture(gesture) {
+					gesture = clampScale(gesture, initial_ctm);
 					applyMatrix(
-						el,
+						el, 
 						gestureToMatrix(gesture, origin).multiply(initial_ctm)
 					);
 				},
 				endGesture(gesture) {
-					initial_ctm = gestureToMatrix(gesture, origin).multiply(
-						initial_ctm
-					);
+					gesture = clampScale(gesture, initial_ctm);
+					initial_ctm = gestureToMatrix(gesture, origin).multiply(initial_ctm);
 					applyMatrix(el, initial_ctm);
+					updateCurrentScale();
 				}
 			});
 
@@ -114,11 +122,11 @@
 			 */
 			function applyGesture(gesture) {
 				el.style.transform = '';
+				gesture = clampScale(gesture, initial_ctm);
 				let origin = getOrigin(el, gesture);
-				initial_ctm = gestureToMatrix(gesture, origin).multiply(
-					initial_ctm
-				);
+				initial_ctm = gestureToMatrix(gesture, origin).multiply(initial_ctm);
 				applyMatrix(el, initial_ctm);
+				updateCurrentScale();
 			}
 
 			/*
@@ -137,43 +145,73 @@
 				return Math.hypot(m.a, m.b);
 			}
 
+			let factor = 0.2;
+
 			document.querySelector('#zoom-in').addEventListener('click', e => {
 				applyGesture({
-					scale: 1.1,
+					scale: 1 + factor,
 					translation: { x: 0, y: 0 },
 					rotation: 0,
-					origin: { 
-						x: window.innerWidth / 2, 
-						y: window.innerHeight / 2 
+					origin: {
+						x: window.innerWidth / 2,
+						y: window.innerHeight / 2
 					}
 				});
 			});
 
 			document.querySelector('#zoom-out').addEventListener('click', e => {
 				applyGesture({
-					scale: 0.9,
+					scale: 1 / (1 + factor),
 					translation: { x: 0, y: 0 },
 					rotation: 0,
-					origin: { 
-						x: window.innerWidth / 2, 
-						y: window.innerHeight / 2 
+					origin: {
+						x: window.innerWidth / 2,
+						y: window.innerHeight / 2
 					}
 				});
 			});
 
 			Array.from(document.querySelectorAll('.zoom-exact')).map(el => {
 				el.addEventListener('click', e => {
+					let s = el.dataset.level / getScaleFromMatrix(initial_ctm);
 					applyGesture({
-						scale: el.dataset.level / getScaleFromMatrix(initial_ctm),
+						scale: s,
 						translation: { x: 0, y: 0 },
 						rotation: 0,
-						origin: { 
-							x: window.innerWidth / 2, 
-							y: window.innerHeight / 2 
+						origin: {
+							x: window.innerWidth / 2,
+							y: window.innerHeight / 2
 						}
 					});
-				})
+				});
 			});
+
+			/*
+				Given the element's current transform matrix `m`
+				adjust the `gesture` object so that when applied 
+				to the element, the element's scale does not go 
+				under 25%, nor over 400%.
+			 */
+			function clampScale(gesture, m) {
+				let s = getScaleFromMatrix(m);
+				let proposed_scale = gesture.scale * s;
+				if (proposed_scale > 4 || proposed_scale < 0.25) {
+					return {
+						...gesture,
+						scale: Math.max(0.25, Math.min(4, proposed_scale)) / s
+					}
+				}
+				return gesture;
+			}
+
+			/*
+				Display the element's current scale 
+				at the bottom right corner of the screen.
+			 */
+			function updateCurrentScale() {
+				document.getElementById('current-scale').textContent = 
+				(getScaleFromMatrix(initial_ctm) * 100).toFixed(2) + '%';
+			}
 		</script>
 	</body>
 </html>
