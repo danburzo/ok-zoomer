@@ -257,13 +257,13 @@ function getOrigin(el, gesture) {
 function applyMatrix(el, matrix) {
 	if (el instanceof HTMLElement) {
 		el.style.transform = matrix;
-	} else if (el instanceof SVGElement) {
-		let transformList = el.transform.baseVal;
-		let transform = transformList.createSVGTransformFromMatrix(matrix);
-		transformList.initialize(transform);
-	} else {
-		throw new Error('Expected HTML or SVG element');
+		return;
 	}
+	if (el instanceof SVGElement) {
+		el.setAttribute('transform', matrix);
+		return;
+	}
+	throw new Error('Expected HTML or SVG element');
 }
 
 export { okzoomer, gestureToMatrix, getOrigin, applyMatrix };
